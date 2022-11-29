@@ -107,7 +107,7 @@
     <profile>
         <subsystem xmlns="urn:jboss:domain:logging:6.0">
             <console-handler name="CONSOLE">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
                 <formatter>
                     <pattern-formatter pattern="%d{HH:mm:ss,SSS} %-5p [%c] (%t) %s%E%n"/>
                 </formatter>
@@ -121,7 +121,7 @@
                 <append value="true"/>
             </periodic-rotating-file-handler>
             <periodic-size-rotating-file-handler name="PERIODIC_SIZE_HANDLER" rotate-on-boot="true">
-                <level name="DEBUG"/>
+                <level name="INFO"/>
                 <file relative-to="jboss.server.log.dir" path="${jboss.node.name}.log"/>
                 <rotate-size value="10m"/>
                 <max-backup-index value="10"/>
@@ -129,22 +129,22 @@
                 <append value="true"/>
             </periodic-size-rotating-file-handler>
             <logger category="com.arjuna">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
             </logger>
             <logger category="org.apache.tomcat.util.modeler">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
             </logger>
             <logger category="sun.rmi">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
             </logger>
             <logger category="jacorb">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
             </logger>
             <logger category="jacorb.config">
-                <level name="DEBUG"/>
+                <level name="WARN"/>
             </logger>
             <root-logger>
-                <level name="DEBUG"/>
+                <level name="WARN"/>
                 <handlers>
                     <handler name="CONSOLE"/>
                     <handler name="PERIODIC_SIZE_HANDLER"/>
@@ -365,7 +365,14 @@
             </cache-container>
             <cache-container name="web" default-cache="passivation" module="org.wildfly.clustering.web.infinispan">
                 <local-cache name="passivation">
+                    <locking acquire-timeout="60000" isolation="REPEATABLE_READ" striping="false"/>
+                    <transaction mode="BATCH"/>
                     <file-store passivation="true" purge="false"/>
+                </local-cache>
+                <local-cache name="persistent">
+                    <locking acquire-timeout="60000" isolation="REPEATABLE_READ" striping="false"/>
+                    <transaction mode="BATCH"/>
+                    <file-store passivation="false" purge="false"/>
                 </local-cache>
             </cache-container>
             <cache-container name="ejb" aliases="sfsb" default-cache="passivation" module="org.wildfly.clustering.ejb.infinispan">
@@ -389,7 +396,7 @@
             </cache-container>
         </subsystem>
         <subsystem xmlns="urn:jboss:domain:io:3.0">
-            <worker name="default" io-threads="1000" task-core-threads="50" task-max-threads="1024"/>
+            <worker name="default"/>
             <buffer-pool name="default"/>
         </subsystem>
         <subsystem xmlns="urn:jboss:domain:jaxrs:1.0"/>
@@ -434,7 +441,7 @@
                 <security-setting name="#">
                     <role name="guest" send="true" consume="true" create-non-durable-queue="true" delete-non-durable-queue="true"/>
                 </security-setting>
-                <address-setting name="#" dead-letter-address="jms.queue.DLQ" expiry-address="jms.queue.ExpiryQueue" redelivery-delay="0" max-delivery-attempts="-1" max-size-bytes="10485760" page-size-bytes="2097152" address-full-policy="PAGE" message-counter-history-day-limit="10"/>
+                <address-setting name="#" dead-letter-address="jms.queue.DLQ" expiry-address="jms.queue.ExpiryQueue" max-size-bytes="10485760" page-size-bytes="2097152" message-counter-history-day-limit="10"/>
                 <http-connector name="http-connector" socket-binding="http" endpoint="http-acceptor"/>
                 <http-connector name="http-connector-throughput" socket-binding="http" endpoint="http-acceptor-throughput">
                     <param name="batch-delay" value="50"/>
@@ -481,6 +488,12 @@
                         tocfT24ra-ra.rar
                     </archive>
                     <transaction-support>XATransaction</transaction-support>
+                    <config-property name="listenPort">
+                        0
+                    </config-property>
+                    <config-property name="listenHost">
+                        127.0.0.1
+                    </config-property>
                     <connection-definitions>
                         <connection-definition class-name="com.temenos.tocf.t24ra.outbound.T24ManagedConnectionFactory" jndi-name="java:/jca/t24ConnectionFactory" pool-name="T24ConnectionFactory">
                             <config-property name="charset">
@@ -493,13 +506,13 @@
                                 2048
                             </config-property>
                             <config-property name="hosts">
-                                10.2.31.25
+                                10.2.31.25,10.2.31.26
                             </config-property>
                             <config-property name="envVariables">
                                 OFS_SOURCE=BROWSERTC
                             </config-property>
                             <config-property name="ports">
-                                21003
+                                21003,21004
                             </config-property>
                             <config-property name="compression">
                                 true
@@ -511,16 +524,9 @@
                                 true
                             </config-property>
                             <xa-pool>
-                                <min-pool-size>10</min-pool-size>
-                                <max-pool-size>500</max-pool-size>
-                                <prefill>false</prefill>
+                                <min-pool-size>20</min-pool-size>
+                                <max-pool-size>50</max-pool-size>
                             </xa-pool>
-                            <security>
-                                <application/>
-                            </security>
-                            <timeout>
-                                <idle-timeout-minutes>10</idle-timeout-minutes>
-                            </timeout>
                         </connection-definition>
                     </connection-definitions>
                 </resource-adapter>
@@ -578,8 +584,8 @@
         <subsystem xmlns="urn:jboss:domain:undertow:7.0" default-server="default-server" default-virtual-host="default-host" default-servlet-container="default" default-security-domain="other">
             <buffer-cache name="default"/>
             <server name="default-server">
-                <http-listener name="default" max-connections="1000" socket-binding="http" max-parameters="10000" redirect-socket="https" enable-http2="true"/>
-                <https-listener name="https" max-connections="1000" socket-binding="https" max-parameters="10000" no-request-timeout="-1" security-realm="CertificateRealm" enabled-cipher-suites="TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_RSA_WITH_AES_128_GCM_SHA256" enabled-protocols="TLSv1.1,TLSv1.2" enable-http2="true"/>
+                <http-listener name="default" socket-binding="http" max-parameters="10000" redirect-socket="https" enable-http2="true"/>
+                <https-listener name="https" socket-binding="https" security-realm="ApplicationRealm" enable-http2="true"/>
                 <host name="default-host" alias="localhost">
                     <location name="/" handler="welcome-content"/>
                     <filter-ref name="x-frame-options"/>
